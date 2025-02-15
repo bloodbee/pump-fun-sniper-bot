@@ -1,0 +1,45 @@
+[tool.poetry]
+name = "pump-fun-sniper-bot"
+package-mode = false
+version = "0.1.0"
+description = "Pump.fun sniper bot in Python"
+license = "MIT"
+authors = [
+    "Mathieu Dufour <mathieu@bloodbee.space>"
+]
+readme = "README.md"
+keywords = ["pump", "memecoin", "solana", "sniper", "bot", "trading"]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+solana = "^0.36.5"
+requests = "^2.32.3"
+python-dotenv = "^1.0.1"
+solders = "^0.25.0"
+base58 = "^2.1.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+pytest-asyncio = "^0.25.3"
+requests-mock = "^1.12.1"
+pytest-mock = "^3.14.0"
+flake8 = "^7.1.1"
+
+[tool.poetry.requires-plugins]
+poetry-plugin-export = ">=1.8"
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = ["."]
+testpaths = "tests"
+filterwarnings = [
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+    "ignore::RuntimeWarning",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning:websockets.legacy",
+    "ignore::DeprecationWarning:anyio._backends._asyncio"
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

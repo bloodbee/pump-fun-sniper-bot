@@ -1,0 +1,10 @@
+{
+	"txType": "create",
+	"mint": "BXvk2E3EtQ68tJ4nSagj4V6eyphCnZ9qHhzqCGoTpump",
+	"traderPublicKey": "39R7MixoWL23Enq49EZjeVytQeGuZpqCpoWPRfENyvxR",
+	"solAmount": 2,
+	"marketCapSol": 31.81,
+	"name": "Justice For Kanye",
+	"symbol": "JFK",
+	"bondingCurveKey": "CMg2mGxv7DHciDqe3t5eFDpp2BTAdMfeZ6xTRSfdCnsJ"
+}

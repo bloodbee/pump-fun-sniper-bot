@@ -1,0 +1,9 @@
+{
+	"txType": "buy",
+	"mint": "5D75Q7cxdEZHoYrctCzNJ5nvNSTTm6nGuhUDWgHNpump",
+	"traderPublicKey": "GSW8ChaXzobBpgxHmm9nmeaRpPyjSj4YnkmgBMzLNbut",
+	"tokenAmount": 40816.32653,
+	"solAmount": 0.010050302,
+	"marketCapSol": 246.26,
+	"bondingCurveKey": "CMg2mGxv7DHciDqe3t5eFDpp2BTAdMfeZ6xTRSfdCnsJ"
+}
