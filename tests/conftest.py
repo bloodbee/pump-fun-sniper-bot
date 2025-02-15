@@ -3,6 +3,7 @@ import json
 
 from solders.litesvm import LiteSVM
 from solders.keypair import Keypair
+from solders.pubkey import Pubkey
 
 
 @pytest.fixture
@@ -102,3 +103,8 @@ def test_account(litesvm_client):
     account = Keypair()
     litesvm_client.airdrop(account.pubkey(), 1_000_000_000)  # 1 SOL
     return account
+
+
+@pytest.fixture
+def test_pubkey():
+    return Pubkey(bytes([1] * 32)).new_unique()

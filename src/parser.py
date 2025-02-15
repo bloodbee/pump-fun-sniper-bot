@@ -1,3 +1,4 @@
+from solders.pubkey import Pubkey
 from .models.transaction import Transaction
 from .models.token import Token
 
@@ -13,28 +14,36 @@ class Parser:
 
         # Extract common fields
         txType = self.message.get("txType")
-        token = Token(mint=self.message.get("mint"))
 
-        # If the transaction is a token creation (minting)
-        if txType == "create":
-            token.name = self.message.get("name")
-            token.symbol = self.message.get("symbol")
+        mint = self.message.get("mint")
+        if mint:
+            token = Token(mint=Pubkey.from_string(mint))
 
-        # Create the Transaction object
-        tx = Transaction(
-            token=token,
-            traderPublicKey=self.message.get("traderPublicKey"),
-            txType=txType,
-            tokenAmount=self._safe_float("tokenAmount"),
-            solAmount=self._safe_float("solAmount"),
-            marketCapSol=self._safe_float("marketCapSol"),
-            initialBuy=self._safe_float("initialBuy"),
-            bondingCurveKey=self.message.get("bondingCurveKey")
-        )
+            # If the transaction is a token creation (minting)
+            if txType == "create":
+                token.name = self.message.get("name")
+                token.symbol = self.message.get("symbol")
 
-        tx.token.price = tx.token_price()
+            # Create the Transaction object
+            tx = Transaction(
+                token=token,
+                traderPublicKey=self.message.get("traderPublicKey"),
+                txType=txType,
+                tokenAmount=self._safe_float("tokenAmount"),
+                solAmount=self._safe_float("solAmount"),
+                marketCapSol=self._safe_float("marketCapSol"),
+                initialBuy=self._safe_float("initialBuy"),
+            )
 
-        return tx
+            if txType == "create":
+                tx.vTokensInBondingCurve = self._safe_float("vTokensInBondingCurve")
+                tx.vSolInBondingCurve = self._safe_float("vSolInBondingCurve")
+
+            tx.set_associated_bonding_curve()
+
+            tx.token.price = tx.token_price()
+
+            return tx
 
     def _safe_float(self, key: str) -> float:
         """Helper method to safely convert a dictionary value to float, handling missing keys."""

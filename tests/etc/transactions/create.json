@@ -6,5 +6,7 @@
 	"marketCapSol": 31.81,
 	"name": "Justice For Kanye",
 	"symbol": "JFK",
-	"bondingCurveKey": "CMg2mGxv7DHciDqe3t5eFDpp2BTAdMfeZ6xTRSfdCnsJ"
+	"bondingCurveKey": "CMg2mGxv7DHciDqe3t5eFDpp2BTAdMfeZ6xTRSfdCnsJ",
+	"vTokensInBondingCurve": 785121951.2195129,
+	"vSolInBondingCurve":40.999999999999964
 }

@@ -1,4 +1,5 @@
 import pytest
+from solders.pubkey import Pubkey
 
 from src.parser import Parser
 from src.models.token import Token
@@ -16,7 +17,7 @@ class TestParser:
 
         assert transaction.txType == "create"
         assert isinstance(transaction.token, Token)
-        assert transaction.token.mint == "BXvk2E3EtQ68tJ4nSagj4V6eyphCnZ9qHhzqCGoTpump"
+        assert transaction.token.mint == Pubkey.from_string("BXvk2E3EtQ68tJ4nSagj4V6eyphCnZ9qHhzqCGoTpump")  # noqa: E501
         assert transaction.token.name == "Justice For Kanye"
         assert transaction.token.symbol == "JFK"
         assert transaction.solAmount == 2.0
@@ -30,7 +31,7 @@ class TestParser:
 
         assert transaction.txType == "buy"
         assert isinstance(transaction.token, Token)
-        assert transaction.token.mint == "5D75Q7cxdEZHoYrctCzNJ5nvNSTTm6nGuhUDWgHNpump"
+        assert transaction.token.mint == Pubkey.from_string("5D75Q7cxdEZHoYrctCzNJ5nvNSTTm6nGuhUDWgHNpump")  # noqa: E501
         assert transaction.traderPublicKey == "GSW8ChaXzobBpgxHmm9nmeaRpPyjSj4YnkmgBMzLNbut"
         assert transaction.tokenAmount == 40816.32653
         assert transaction.solAmount == 0.010050302
@@ -44,7 +45,7 @@ class TestParser:
 
         assert transaction.txType == "sell"
         assert isinstance(transaction.token, Token)
-        assert transaction.token.mint == "5D75Q7cxdEZHoYrctCzNJ5nvNSTTm6nGuhUDWgHNpump"
+        assert transaction.token.mint == Pubkey.from_string("5D75Q7cxdEZHoYrctCzNJ5nvNSTTm6nGuhUDWgHNpump")  # noqa: E501
         assert transaction.traderPublicKey == "GSW8ChaXzobBpgxHmm9nmeaRpPyjSj4YnkmgBMzLNbut"
         assert transaction.tokenAmount == 15000.0
         assert transaction.solAmount == 0.005

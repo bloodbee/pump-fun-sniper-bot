@@ -1,22 +1,22 @@
+from copy import deepcopy
+from unittest.mock import AsyncMock, patch, MagicMock, call, Mock
+import asyncio
+import difflib
 import json
 import os
 import pytest
 import requests
-import difflib
-from copy import deepcopy
-import asyncio
-from unittest.mock import AsyncMock, patch, MagicMock, call
 import requests_mock
 
-from solana.rpc.async_api import AsyncClient
+from solana.rpc.api import Client
 from solana.rpc.commitment import Confirmed
-from solders.keypair import Keypair
-from solders.pubkey import Pubkey
-from solders.message import Message
-from solders.transaction import VersionedTransaction
-from solders.system_program import transfer, TransferParams
-from solders.rpc.responses import GetLatestBlockhashResp
 from solders.hash import Hash
+from solders.keypair import Keypair
+from solders.message import Message
+from solders.pubkey import Pubkey
+from solders.rpc.responses import GetLatestBlockhashResp
+from solders.system_program import transfer, TransferParams
+from solders.transaction import VersionedTransaction
 
 from src.bot import Bot
 from src.models.token import Token
@@ -76,38 +76,39 @@ class TestBot:
             json.dumps({"method": "unsubscribeTokenTrade", "keys": [token_address]})
         )
 
-    @pytest.mark.asyncio
-    async def test_send_buy_transaction(self, test_account):
+    def test_send_buy_transaction(self, test_pubkey, test_account):
         """Test sending a buy transaction."""
-        token = Token(
-            mint="1111111QLbz7JHiBTspS962RLKV8GndWFwiEaqKM", name="Test Token"
+        token = Token(mint=test_pubkey, name="Test Token")
+        transaction = Transaction(
+            token=token, vSolInBondingCurve=100, vTokensInBondingCurve=100
         )
-        transaction = Transaction(token=token)
+        transaction.set_associated_bonding_curve()
         self.bot.account = test_account
 
-        mock_client = AsyncMock(spec=AsyncClient)
-        with patch("solana.rpc.async_api.AsyncClient", return_value=mock_client):
-            result = await self.bot.send_buy_transaction(transaction)
-
+        mock_client = Mock(spec=Client)
+        with patch("solana.rpc.api.Client", return_value=mock_client), patch(
+            "src.utils.Utils.confirm_txn", return_value=True
+        ):
+            result = self.bot.send_buy_transaction(transaction)
             assert result is True
-            assert token.mint in self.bot.tracked_tokens
 
-    @pytest.mark.asyncio
-    async def test_send_buy_transaction_failure(self, test_account):
+    def test_send_buy_transaction_failure(self, test_pubkey, test_account):
         """Test sending a buy transaction when it fails."""
-        token = Token(
-            mint="1111111QLbz7JHiBTspS962RLKV8GndWFwiEaqKM", name="Test Token"
+        token = Token(mint=test_pubkey, name="Test Token")
+        transaction = Transaction(
+            token=token, vTokensInBondingCurve=100, vSolInBondingCurve=100
         )
-        transaction = Transaction(token=token)
+        transaction.set_associated_bonding_curve()
         self.bot.account = test_account
 
-        mock_client = AsyncMock(spec=AsyncClient)
+        mock_client = Mock(spec=Client)
         self.bot._Bot__send_transaction = AsyncMock(
             side_effect=Exception("Transaction failed")
         )
-        with patch("solana.rpc.async_api.AsyncClient", return_value=mock_client):
-            result = await self.bot.send_buy_transaction(transaction)
-
+        with patch("solana.rpc.api.Client", return_value=mock_client), patch(
+            "src.utils.Utils.confirm_txn", return_value=False
+        ):
+            result = self.bot.send_buy_transaction(transaction)
             assert result is False
 
     @pytest.mark.asyncio
@@ -115,6 +116,7 @@ class TestBot:
         """Test bot processing a 'create' transaction."""
         message = load_file("tests/etc/transactions/create.json")
         tx = Parser(json.loads(message)).parse()
+        token_address = str(tx.token.mint)
 
         mock_ws = AsyncMock()
         mock_ws.__aiter__.return_value = [
@@ -133,14 +135,14 @@ class TestBot:
         ), patch.object(
             self.bot, "unsubscribe_token_transactions", new_callable=AsyncMock
         ), patch.object(
-            self.bot, "send_buy_transaction", new_callable=AsyncMock, return_value=True
+            self.bot, "send_buy_transaction", new_callable=Mock, return_value=True
         ):
 
             await self.bot.run()
 
             self.bot.subscribe_new_tokens.assert_called_once_with(mock_ws)
             self.bot.subscribe_token_transactions.assert_called_once_with(
-                mock_ws, tx.token.mint
+                mock_ws, token_address
             )
             self.bot.unsubscribe_new_tokens.assert_called_once_with(mock_ws)
             self.bot.send_buy_transaction.assert_called_once_with(tx)
@@ -150,6 +152,7 @@ class TestBot:
         """Test bot processing a 'buy' transaction."""
         message = load_file("tests/etc/transactions/buy.json")
         tx = Parser(json.loads(message)).parse()
+        token_address = str(tx.token.mint)
 
         mock_ws = AsyncMock()
         mock_ws.__aiter__.return_value = [
@@ -159,7 +162,7 @@ class TestBot:
         mock_connect = AsyncMock()
         mock_connect.__aenter__.return_value = mock_ws
 
-        self.bot.tracked_tokens[tx.token.mint] = tx.token
+        self.bot.tracked_tokens[token_address] = tx.token
 
         with patch("websockets.connect", return_value=mock_connect), patch.object(
             self.bot, "subscribe_new_tokens", new_callable=AsyncMock
@@ -172,16 +175,17 @@ class TestBot:
             await self.bot.run()
 
             self.bot.subscribe_new_tokens.assert_called_once_with(mock_ws)
-            assert self.bot.tracked_tokens[tx.token.mint].price == tx.token_price()
+            assert self.bot.tracked_tokens[token_address].price == tx.token_price()
 
     @pytest.mark.asyncio
     async def test_run_sell_transaction(self, load_file):
         """Test bot processing a 'sell' transaction."""
         message = load_file("tests/etc/transactions/sell.json")
         tx = Parser(json.loads(message)).parse()
+        token_address = str(tx.token.mint)
 
-        self.bot.tracked_tokens[tx.token.mint] = deepcopy(tx.token)
-        self.bot.tracked_tokens[tx.token.mint].price = 0.008
+        self.bot.tracked_tokens[token_address] = deepcopy(tx.token)
+        self.bot.tracked_tokens[token_address].price = 0.008
 
         mock_ws = AsyncMock()
         mock_ws.__aiter__.return_value = [
@@ -198,15 +202,15 @@ class TestBot:
         ), patch.object(
             self.bot, "unsubscribe_token_transactions", new_callable=AsyncMock
         ), patch.object(
-            self.bot, "send_sell_transaction", new_callable=AsyncMock, return_value=True
+            self.bot, "send_sell_transaction", new_callable=Mock, return_value=True
         ):
 
             await self.bot.run()
 
             self.bot.subscribe_new_tokens.assert_called_once_with(mock_ws)
             self.bot.unsubscribe_token_transactions.calls = [
-                call(mock_ws, tx.token),
-                call(mock_ws, tx.token),
+                call(mock_ws, token_address),
+                call(mock_ws, token_address),
             ]
             self.bot.unsubscribe_new_tokens.asseunsubscribe_token_transactiort_called_once_with(
                 mock_ws

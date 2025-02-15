@@ -1,4 +1,5 @@
 import pytest
+
 from src.models.transaction import Transaction
 from src.models.token import Token
 
@@ -6,9 +7,9 @@ from src.models.token import Token
 class TestTransaction:
     """Unit tests for the Transaction dataclass."""
 
-    def test_transaction_initialization(self):
+    def test_transaction_initialization(self, test_pubkey):
         """Test that a Transaction instance initializes correctly with provided values."""
-        token = Token(mint="ABC123", name="Sample Token", symbol="STK")
+        token = Token(mint=test_pubkey, name="Sample Token", symbol="STK")
         transaction = Transaction(
             token=token,
             traderPublicKey="Trader123",
@@ -37,7 +38,6 @@ class TestTransaction:
         assert transaction.solAmount is None
         assert transaction.marketCapSol is None
         assert transaction.initialBuy is None
-
 
     def test_token_price_calculation(self):
         """Test that token_price method correctly calculates price per token."""

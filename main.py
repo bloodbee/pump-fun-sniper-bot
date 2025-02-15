@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 import os
 from dotenv import load_dotenv
 
@@ -19,7 +20,8 @@ async def main():
         try:
             await bot.run()
         except Exception as e:
-            print(f"[ERROR] WebSocket connection lost: {e}. Reconnecting in 5 seconds...")
+            traceback.print_exc()
+            print(f"[ERROR] WebSocket connection lost: {e}. Reconnecting ...")
             await asyncio.sleep(POLL_INTERVAL)
 
 
