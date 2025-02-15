@@ -1,6 +1,8 @@
-# PUMP.FUN SNIPER BOT
+# PUMP.FUN SNIPER BOT
 
-The PUMP.FUN Sniper Bot is a tool designed to automate the process of sniping newly listed tokens on the PUMP.FUN platform. It aims to provide users with a competitive edge by executing trades faster than manual methods.
+The PUMP.FUN Sniper Bot is a tool designed to automate the process of sniping newly listed tokens on the [pump.fun](https://pump.fun) platform.
+
+It aims to provide users with a competitive edge by executing trades faster than manual methods.
 
 ## Features
 

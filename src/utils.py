@@ -3,14 +3,12 @@ import os
 import re
 
 SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.6"))
-FREEZE_AUTHORITY_REVOKED = os.getenv("ALLOW_FREEZE_AUTHORITY_REVOKED", True)
-MINT_AUTHORITY_REVOKED = os.getenv("ALLOW_MINT_AUTHORITY_REVOKED", True)
 
 
 class Utils:
 
     @staticmethod
-    def is_similar_token(tokens, new_token_name):
+    def is_similar_token(tokens: list, new_token_name: str) -> bool:
         """Checks if a token's name is too similar to a previously bought token."""
         for token in tokens:
             existing_name = token["name"]

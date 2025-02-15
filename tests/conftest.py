@@ -8,17 +8,22 @@ from solders.keypair import Keypair
 @pytest.fixture
 def load_json():
     """Fixture to load JSON data from a given file path."""
+
     def _load_json(filepath):
         with open(filepath, "r") as f:
             return json.load(f)
+
     return _load_json
+
 
 @pytest.fixture
 def load_file():
     """Fixture to load JSON data from a given file path."""
+
     def _load_file(filepath):
         with open(filepath, "r") as f:
             return f.read()
+
     return _load_file
 
 

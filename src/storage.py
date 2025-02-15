@@ -10,7 +10,7 @@ class Storage:
         self.tokens = []
         self.filepath = filepath
 
-    def load(self):
+    def load(self) -> None:
         """Loads purchased tokens from a JSON file."""
         if os.path.exists(self.filepath):
             with open(self.filepath, "r") as file:
@@ -22,7 +22,7 @@ class Storage:
         else:
             self.tokens = []
 
-    def save(self):
+    def save(self) -> None:
         """Saves purchased tokens to a JSON file."""
         with open(self.filepath, "w") as file:
             json.dump(self.tokens, file, indent=4)

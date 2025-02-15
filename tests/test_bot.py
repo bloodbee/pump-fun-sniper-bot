@@ -30,6 +30,10 @@ class TestBot:
     def setup_class(cls):
         cls.bot = Bot()
 
+    @pytest.fixture(autouse=True)
+    def set_wallet_private_key(self, monkeypatch):
+        monkeypatch.setenv("SOLANA_RPC_URL", "https://api.devnet.solana.com")
+
     def teardown_method(self):
         # clean tracked tokens
         self.bot.tracked_tokens = {}
@@ -73,14 +77,13 @@ class TestBot:
         )
 
     @pytest.mark.asyncio
-    async def test_send_buy_transaction(self):
+    async def test_send_buy_transaction(self, test_account):
         """Test sending a buy transaction."""
         token = Token(
             mint="1111111QLbz7JHiBTspS962RLKV8GndWFwiEaqKM", name="Test Token"
         )
-        transaction = Transaction(
-            token=token
-        )
+        transaction = Transaction(token=token)
+        self.bot.account = test_account
 
         mock_client = AsyncMock(spec=AsyncClient)
         with patch("solana.rpc.async_api.AsyncClient", return_value=mock_client):
@@ -90,14 +93,13 @@ class TestBot:
             assert token.mint in self.bot.tracked_tokens
 
     @pytest.mark.asyncio
-    async def test_send_buy_transaction_failure(self):
+    async def test_send_buy_transaction_failure(self, test_account):
         """Test sending a buy transaction when it fails."""
         token = Token(
             mint="1111111QLbz7JHiBTspS962RLKV8GndWFwiEaqKM", name="Test Token"
         )
-        transaction = Transaction(
-            token=token
-        )
+        transaction = Transaction(token=token)
+        self.bot.account = test_account
 
         mock_client = AsyncMock(spec=AsyncClient)
         self.bot._Bot__send_transaction = AsyncMock(

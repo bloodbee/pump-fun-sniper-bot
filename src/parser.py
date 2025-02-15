@@ -8,7 +8,7 @@ class Parser:
     def __init__(self, message):
         self.message = message
 
-    def parse(self):
+    def parse(self) -> Transaction:
         """Parse the JSON message into a Transaction object."""
 
         # Extract common fields
@@ -36,7 +36,7 @@ class Parser:
 
         return tx
 
-    def _safe_float(self, key):
+    def _safe_float(self, key: str) -> float:
         """Helper method to safely convert a dictionary value to float, handling missing keys."""
         value = self.message.get(key)
         return float(value) if value is not None else None
