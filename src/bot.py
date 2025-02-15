@@ -36,9 +36,8 @@ SOLANA_RPC_URL = os.getenv("SOLANA_RPC_URL")
 BUY_AMOUNT_SOL = float(os.getenv("BUY_AMOUNT_SOL"))
 SLIPPAGE_PERCENT = float(os.getenv("SLIPPAGE_PERCENT")) / 100
 TRAILING_STOP_LOSS = float(os.getenv("TRAILING_STOP_LOSS")) / 100
-AUTO_SELL_AFTER_MINS = int(
-    os.getenv("AUTO_SELL_AFTER_MINS", 0)
-)  # Default to 0 (disabled)
+AUTO_SELL_AFTER_MINS = int(os.getenv("AUTO_SELL_AFTER_MINS", 0))  # 0 = disabled
+MAX_TOKEN_TRACKED = int(os.getenv("MAX_TOKEN_TRACKED", 3))
 PUMP_WS_URL = "wss://pumpportal.fun/api/data"
 
 
@@ -60,8 +59,9 @@ class Bot:
                 token_address = tx.token.mint
 
                 if tx.txType == "create":
-                    await self.subscribe_token_transactions(ws, token_address)
-                    await self.send_buy_transaction(tx)
+                    res = await self.send_buy_transaction(tx)
+                    if res:
+                        await self.subscribe_token_transactions(ws, token_address)
 
                 elif tx.txType == "buy":
                     price = tx.token_price()
@@ -110,16 +110,19 @@ class Bot:
 
     async def send_buy_transaction(self, transaction):
         """Sends a buy transaction for the first available token."""
+        token = transaction.token
+        token_address = str(token.mint)
+        if len(self.tracked_tokens) >= MAX_TOKEN_TRACKED:
+            print(
+                f"[SKIPPED] Max tracked tokens ({MAX_TOKEN_TRACKED}) reached. Cannot buy {token.name} ({token_address})"  # noqa: E501
+            )
+            return False  # Skip buying
+
         async with AsyncClient(SOLANA_RPC_URL) as client:
             await client.is_connected()
             async with self.mutex:
-                token = transaction.token
-                print(f"[INFO] Buying token: {token.name} ({token.mint})")
-                receiver = (
-                    Pubkey.from_string(token.mint)
-                    if isinstance(token.mint, str)
-                    else token.mint
-                )
+                print(f"[BUY] Buying token: {token.name} ({token_address})")
+                receiver = Pubkey.from_string(token_address)
 
                 # Construct transaction
                 instructions = [
@@ -134,17 +137,17 @@ class Bot:
                 try:
                     # Send transaction
                     response = await self.__send_transaction(client, instructions)
-                    print(f"[SUCCESS] Buy Transaction Sent: {response}")
+                    print(f"[SUCCESS] Buy transaction sent: {response}")
                     # update and save storage
                     self.storage.tokens.append(
-                        {"name": token.name, "address": str(receiver)}
+                        {"name": token.name, "address": token_address}
                     )
                     self.storage.save()
                     # Update tracked tokens and purchased datetime
-                    self.tracked_tokens[str(token.mint)] = token
-                    self.token_purchase_time[str(token.mint)] = {
-                        'transaction': transaction,
-                        'buy_time': datetime.utcnow()
+                    self.tracked_tokens[token_address] = token
+                    self.token_purchase_time[token_address] = {
+                        "transaction": transaction,
+                        "buy_time": datetime.utcnow(),
                     }
                     return True
                 except Exception as e:
@@ -157,23 +160,24 @@ class Bot:
             await client.is_connected()
             async with self.mutex:
                 token = transaction.token
-                print(f"[SELL] Selling token: {token.name} ({token.mint})")
+                token_address = str(token.mint)
+                print(f"[SELL] Selling token: {token.name} ({token_address})")
 
                 sender = self.account.pubkey()
 
                 # Get Associated Token Address (ATA)
                 ata_address = get_associated_token_address(
-                    sender, Pubkey.from_string(token.mint)
+                    sender, Pubkey.from_string(token_address)
                 )
 
                 # Fetch Token Balance
                 balance = await self.__get_token_balance(client, ata_address)
 
                 if balance == 0:
-                    print(f"[SKIPPED] No tokens to sell for {token.mint}")
+                    print(f"[SKIPPED] No tokens to sell for {token_address}")
                     return False
 
-                print(f"[INFO] Selling {balance} tokens of {token.mint}")
+                print(f"[INFO] Selling {balance} tokens of {token_address}")
 
                 # Construct Sell Order via pum fun liquidity pool + close ATA to save rent
                 instructions = [
@@ -184,7 +188,7 @@ class Bot:
                             owner=sender,
                             amount=balance,
                             decimals=10,
-                            mint=Pubkey.from_string(token.mint),
+                            mint=Pubkey.from_string(token_address),
                             program_id=TOKEN_PROGRAM_ID,
                         )
                     ),
@@ -198,11 +202,13 @@ class Bot:
 
                     # Remove token from storage
                     self.storage.tokens = [
-                        t for t in self.storage.tokens if t["address"] != token.mint
+                        t for t in self.storage.tokens if t["address"] != token_address
                     ]
                     self.storage.save()
-                    if token.mint in self.tracked_tokens:
-                        del self.tracked_tokens[token.mint]
+                    if token_address in self.tracked_tokens:
+                        del self.tracked_tokens[token_address]
+                    if token_address in self.token_purchase_time:
+                        del self.token_purchase_time[token_address]
                     return True
                 except Exception as e:
                     print(f"[ERROR] Sell transaction failed: {e}")
@@ -224,9 +230,9 @@ class Bot:
 
         now = datetime.utcnow()
         tokens_to_sell = [
-            tracked['transaction']
+            tracked["transaction"]
             for token, tracked in self.token_purchase_time.items()
-            if now - tracked['buy_time'] >= timedelta(minutes=AUTO_SELL_AFTER_MINS)
+            if now - tracked["buy_time"] >= timedelta(minutes=AUTO_SELL_AFTER_MINS)
         ]
 
         for transaction in tokens_to_sell:

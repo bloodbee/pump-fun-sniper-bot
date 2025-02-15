@@ -27,7 +27,7 @@ It aims to provide users with a competitive edge by executing trades faster than
 
 ## Usage
 
-1. Copy `sample.env` into `.env` file, update the differents variables to suit your needs.
+1. Copy `sample.env` into `.env` file, update variables to suit your needs.
 2. Start the bot:
     ```bash
     python main.py
