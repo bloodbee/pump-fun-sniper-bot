@@ -14,7 +14,7 @@ POLL_INTERVAL = float(os.getenv("POLL_INTERVAL"))
 async def main():
     storage = Storage()
     storage.load()
-    bot = Bot(storage)
+    bot = Bot(storage=storage, is_rpc=False)
 
     while True:
         try:

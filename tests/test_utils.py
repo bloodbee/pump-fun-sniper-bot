@@ -1,36 +1,11 @@
 import pytest
 from src.utils import Utils
 
-
-EXTRACT_PRICE_DATA = [
-    (
-        {"result": {"value": ["Some log data...", "Price: 0.1234 SOL", "More data"]}},
-        0.1234,
-    ),
-    (
-        {"result": {"value": ["Random log", "Price: 2.5 SOL"]}},
-        2.5,
-    ),
-    (
-        {"result": {"value": ["Some random log message"]}},
-        0,
-    ),
-    (
-        {"result": {"value": []}},
-        0,
-    ),
-    (
-        {},
-        0,
-    ),
-    (
-        {"result": {}},
-        0,
-    ),
-    (
-        {"result": {"value": ["Price SOL 0.1234"]}},  # Wrong order
-        0,
-    ),
+DISCRIMINATOR_DATA = [
+    ("global:buy", 16927863322537952870),
+    ("global:sell", 12502976635542562355),
+    ("global:create", 8576854823835016728),
+    ("account:BondingCurve", 6966180631402821399),
 ]
 
 
@@ -55,3 +30,9 @@ class TestUtils:
         # the token storage is empty, it should never be skipped.
         result = Utils.is_similar_token([], "Random New Token")
         assert result is False
+
+    @pytest.mark.parametrize("instruction_name, expected", DISCRIMINATOR_DATA)
+    def test_caculate_discriminator(self, instruction_name, expected):
+        """Test calculate discriminator"""
+        result = Utils.calculate_discriminator(instruction_name)
+        assert result == expected

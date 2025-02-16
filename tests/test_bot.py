@@ -8,7 +8,7 @@ import pytest
 import requests
 import requests_mock
 
-from solana.rpc.api import Client
+from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
 from solders.hash import Hash
 from solders.keypair import Keypair
@@ -76,7 +76,8 @@ class TestBot:
             json.dumps({"method": "unsubscribeTokenTrade", "keys": [token_address]})
         )
 
-    def test_send_buy_transaction(self, test_pubkey, test_account):
+    @pytest.mark.asyncio
+    async def test_send_rpc_buy_transaction(self, test_pubkey, test_account, monkeypatch):
         """Test sending a buy transaction."""
         token = Token(mint=test_pubkey, name="Test Token")
         transaction = Transaction(
@@ -85,14 +86,18 @@ class TestBot:
         transaction.set_associated_bonding_curve()
         self.bot.account = test_account
 
-        mock_client = Mock(spec=Client)
-        with patch("solana.rpc.api.Client", return_value=mock_client), patch(
-            "src.utils.Utils.confirm_txn", return_value=True
+        mock_client = AsyncMock(spec=AsyncClient)
+        mock_client.confirm_transaction.return_value = True
+        with patch(
+            "solana.rpc.async_api.AsyncClient", return_value=mock_client
+        ), patch.object(
+            self.bot, "_Bot__create_ata", return_value=None
         ):
-            result = self.bot.send_buy_transaction(transaction)
+            result = await self.bot.send_rpc_buy_transaction(transaction)
             assert result is True
 
-    def test_send_buy_transaction_failure(self, test_pubkey, test_account):
+    @pytest.mark.asyncio
+    async def test_send_rpc_buy_transaction_failure(self, test_pubkey, test_account):
         """Test sending a buy transaction when it fails."""
         token = Token(mint=test_pubkey, name="Test Token")
         transaction = Transaction(
@@ -101,14 +106,15 @@ class TestBot:
         transaction.set_associated_bonding_curve()
         self.bot.account = test_account
 
-        mock_client = Mock(spec=Client)
+        mock_client = AsyncMock(spec=AsyncClient)
+        mock_client.confirm_transaction.return_value = False
         self.bot._Bot__send_transaction = AsyncMock(
             side_effect=Exception("Transaction failed")
         )
-        with patch("solana.rpc.api.Client", return_value=mock_client), patch(
-            "src.utils.Utils.confirm_txn", return_value=False
+        with patch(
+            "solana.rpc.async_api.AsyncClient", return_value=mock_client
         ):
-            result = self.bot.send_buy_transaction(transaction)
+            result = await self.bot.send_rpc_buy_transaction(transaction)
             assert result is False
 
     @pytest.mark.asyncio
@@ -135,7 +141,10 @@ class TestBot:
         ), patch.object(
             self.bot, "unsubscribe_token_transactions", new_callable=AsyncMock
         ), patch.object(
-            self.bot, "send_buy_transaction", new_callable=Mock, return_value=True
+            self.bot,
+            "send_rpc_buy_transaction",
+            new_callable=AsyncMock,
+            return_value=True,
         ):
 
             await self.bot.run()
@@ -145,7 +154,7 @@ class TestBot:
                 mock_ws, token_address
             )
             self.bot.unsubscribe_new_tokens.assert_called_once_with(mock_ws)
-            self.bot.send_buy_transaction.assert_called_once_with(tx)
+            self.bot.send_rpc_buy_transaction.assert_called_once_with(tx)
 
     @pytest.mark.asyncio
     async def test_run_buy_transaction(self, load_file):
@@ -202,7 +211,10 @@ class TestBot:
         ), patch.object(
             self.bot, "unsubscribe_token_transactions", new_callable=AsyncMock
         ), patch.object(
-            self.bot, "send_sell_transaction", new_callable=Mock, return_value=True
+            self.bot,
+            "send_rpc_sell_transaction",
+            new_callable=AsyncMock,
+            return_value=True,
         ):
 
             await self.bot.run()
@@ -215,4 +227,4 @@ class TestBot:
             self.bot.unsubscribe_new_tokens.asseunsubscribe_token_transactiort_called_once_with(
                 mock_ws
             )
-            self.bot.send_sell_transaction.assert_called_once_with(tx)
+            self.bot.send_rpc_sell_transaction.assert_called_once_with(tx)

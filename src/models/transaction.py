@@ -4,7 +4,7 @@ from solders.pubkey import Pubkey  # type: ignore
 from spl.token.instructions import get_associated_token_address
 
 from .token import Token
-from ..constants import PUMP_FUN_PROGRAM, SOL_DECIMALS, TOKEN_DECIMALS
+from ..constants import PUMP_PROGRAM, SOL_DECIMALS, TOKEN_DECIMALS
 
 
 @dataclass
@@ -30,7 +30,7 @@ class Transaction:
 
     def set_associated_bonding_curve(self):
         bonding_curve, _ = Pubkey.find_program_address(
-            ["bonding-curve".encode(), bytes(self.token.mint)], PUMP_FUN_PROGRAM
+            ["bonding-curve".encode(), bytes(self.token.mint)], PUMP_PROGRAM
         )
         self.bondingCurveKey = bonding_curve
         self.associatedBondingCurveKey = get_associated_token_address(

@@ -1,10 +1,14 @@
 import difflib
 import os
 import re
+import struct
+import hashlib
 import time
 import json
 from solders.signature import Signature
+from solana.rpc.types import TokenAccountOpts
 from solana.rpc.commitment import Processed, Confirmed
+from solders.pubkey import Pubkey
 
 SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.6"))
 
@@ -28,35 +32,36 @@ class Utils:
         return False
 
     @staticmethod
-    def confirm_txn(
-        client, txn_sig: Signature, max_retries: int = 20, retry_interval: int = 3
-    ) -> bool:
-        retries = 1
+    async def get_token_balance(client, pub_key: Pubkey, mint: Pubkey) -> float | None:
+        try:
+            response = await client.get_token_accounts_by_owner_json_parsed(
+                pub_key, TokenAccountOpts(mint=mint), commitment=Processed
+            )
 
-        while retries < max_retries:
-            try:
-                txn_res = client.get_transaction(
-                    txn_sig,
-                    encoding="json",
-                    commitment=Confirmed,
-                    max_supported_transaction_version=0,
-                )
+            accounts = response.value
+            if accounts:
+                token_amount = accounts[0].account.data.parsed["info"]["tokenAmount"][
+                    "uiAmount"
+                ]
+                return float(token_amount)
 
-                if txn_res is None:
-                    print("[ERROR] Transaction not found.")
-                    return False
-                txn_json = json.loads(txn_res.value.transaction.meta.to_json())
+            return None
+        except Exception as e:
+            print(f"Error fetching token balance: {e}")
+            return None
 
-                if txn_json["err"] is None:
-                    return True
+    @staticmethod
+    def calculate_discriminator(instruction_name):
+        # Create a SHA256 hash object
+        sha = hashlib.sha256()
 
-                if txn_json["err"]:
-                    print("Transaction failed.")
-                    return False
-            except Exception:
-                print("[WARNING] Awaiting confirmation... try count:", retries)
-                retries += 1
-                time.sleep(retry_interval)
+        # Update the hash with the instruction name
+        sha.update(instruction_name.encode("utf-8"))
 
-        print("[ERROR] Max retries reached. Transaction confirmation failed.")
-        return None
+        # Get the first 8 bytes of the hash
+        discriminator_bytes = sha.digest()[:8]
+
+        # Convert the bytes to a 64-bit unsigned integer (little-endian)
+        discriminator = struct.unpack("<Q", discriminator_bytes)[0]
+
+        return discriminator
