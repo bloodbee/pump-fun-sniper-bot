@@ -6,10 +6,10 @@ It aims to provide users with a competitive edge by executing trades faster than
 
 ## Features
 
-- **Automated Trading**: Automatically buys tokens as soon as they are listed.
+- **Automated Trading**: Automatically buy tokens as soon as they are listed.
 - **RPC or HTTP**: Use RPC (the one you prefer) or HTTP ([https://pumpportal.fun/](https://pumpportal.fun/)) to trade.
 - **Configurable Settings**: Customize the bot's behavior to suit your trading strategy.
-- **Automatic sell**: Sell tokens automaticcaly using 3 strategies (see below).
+- **Automatic sell**: Sell tokens automatically using 3 strategies (see below).
 - **Token storage**: Save tracked tokens with automatic reload.
 - **Similiraty comparison**: Doesn't buy similar token names.
 
@@ -17,18 +17,19 @@ It aims to provide users with a competitive edge by executing trades faster than
 
 ### Trailing stop-loss
 
-The bot will sell tokens buy checking each "sell" transactions. If the current transaction price is lower than defined trailing stop-loss percentage, 100% of the tokens are sold.
+The bot sells tokens by checking each sale transaction. If the current transaction price is below the defined stop-loss percentage, 100% of the tokens are sold.
 
 ### Automatic sell after X mins
 
-The bot will automatically sell tokens after X mins passed, as defined per the user.
-It can happen if a token keep going up (trailing stop-loss is not raised), or when there are no sell transactions.
+The bot will automatically sell tokens after X minutes, as defined by the user.
+This can happen if a token continues to rise (the trailing stop-loss is not lifted), or when there are no sell transactions.
 
 ### Take-profit
 
-The bot will sell 50% of tokens at +25% price raise. Then will sell 25% of tokens remaining at +50% price raise.
-Therefore, you will have gains and some tokens remaining.
-It guarantees to have a profit when a token keep going to the moon.
+The bot will sell 50% of the tokens at a price increase of +25%. It will then sell 25% of the remaining tokens at a price increase of +50%.
+
+As a result, you'll have a profit and a few tokens left over.
+This is your guarantee of a profit when a token continues to rise to the moon.
 
 ## Installation
 
@@ -55,10 +56,10 @@ It guarantees to have a profit when a token keep going to the moon.
 
 ## Limitations
 
-Be aware that using a solana rpc is really slow and it takes multiples minutes to send and confirm a transaction.
-You will always be in loose.
+Be aware that using a solana rpc is very slow and that it takes several minutes to send and confirm a transaction.
+You'll always be on hold.
 
-I recommend using PUMPPORTAL (https://pumpportal.fun/trading-api/setup), but be aware that the fees are higher (1% for pumpportal + pum.fun fees).
+I recommend using PUMPPORTAL (https://pumpportal.fun/trading-api/setup), but the fees are higher (1% for pumpportal + pump.fun fees).
 
 ## Contributing
 
