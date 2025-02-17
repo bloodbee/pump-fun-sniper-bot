@@ -11,6 +11,7 @@ It aims to provide users with a competitive edge by executing trades faster than
 - **Configurable Settings**: Customize the bot's behavior to suit your trading strategy.
 - **Automatic sell**: Sell tokens automaticcaly using 3 strategies (see below).
 - **Token storage**: Save tracked tokens with automatic reload.
+- **Similiraty comparison**: Doesn't buy similar token names.
 
 ## Sell strategies
 
@@ -25,7 +26,7 @@ It can happen if a token keep going up (trailing stop-loss is not raised), or wh
 
 ### Take-profit
 
-The bot will sell 50% of tokens at +25% price raise. Then will sell 25% of tokens remaining at +50% price raises.
+The bot will sell 50% of tokens at +25% price raise. Then will sell 25% of tokens remaining at +50% price raise.
 Therefore, you will have gains and some tokens remaining.
 It guarantees to have a profit when a token keep going to the moon.
 
@@ -51,6 +52,13 @@ It guarantees to have a profit when a token keep going to the moon.
     ```bash
     python main.py
     ```
+
+## Limitations
+
+Be aware that using a solana rpc is really slow and it takes multiples minutes to send and confirm a transaction.
+You will always be in loose.
+
+I recommend using PUMPPORTAL (https://pumpportal.fun/trading-api/setup), but be aware that the fees are higher (1% for pumpportal + pum.fun fees).
 
 ## Contributing
 

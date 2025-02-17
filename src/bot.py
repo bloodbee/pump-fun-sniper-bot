@@ -1,28 +1,13 @@
-import struct
 import asyncio
 import json
 import os
-import requests
-from time import sleep
 import websockets
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 
 from solana.rpc.async_api import AsyncClient
-from solana.rpc.commitment import Confirmed
-from solana.rpc.types import TxOpts
-from solders.compute_budget import set_compute_unit_limit, set_compute_unit_price
-from solders.instruction import Instruction, AccountMeta
 from solders.keypair import Keypair
-from solders.message import Message
 from solders.pubkey import Pubkey
-from solders.transaction import Transaction as SolTransaction
-from spl.token.instructions import (
-    get_associated_token_address,
-    close_account,
-    create_associated_token_account,
-    CloseAccountParams,
-)
 
 from .storage import Storage
 from .utils import Utils
@@ -42,6 +27,8 @@ from .constants import (
 from .models.transaction import Transaction
 from .models.token import Token
 from .parser import Parser
+from .transactions.pumpportal_transaction import PumpPortalTransaction
+from .transactions.rpc_transaction import RpcTransaction
 
 load_dotenv()
 
@@ -136,204 +123,6 @@ class Bot:
             json.dumps({"method": "unsubscribeTokenTrade", "keys": [token_address]})
         )
 
-    async def send_rpc_buy_transaction(self, transaction, max_retries=5):
-        """Sends a buy transaction for the first available token using RPC."""
-        token = transaction.token
-        token_address = str(token.mint)
-        if len(self.tracked_tokens) >= MAX_TOKEN_TRACKED:
-            print(
-                f"WARNING [BUY RPC] Max tracked tokens ({MAX_TOKEN_TRACKED}) reached. Cannot buy {token.name} ({token_address})"  # noqa: E501
-            )
-            return False  # Skip buying
-
-        if await self.client.is_connected() is True:
-            print(f"INFO [BUY RPC] Buying token: {token.name} ({token_address})...")
-
-            associated_token_account = get_associated_token_address(
-                self.account.pubkey(), token.mint
-            )
-
-            await self.__create_ata(associated_token_account, token)
-
-            # Calculate amount of tokens
-            amount = int(transaction.sol_for_tokens(BUY_AMOUNT_SOL) * TOKEN_DECIMALS)
-
-            # Build instructions
-            buy_instruction = self.__build_instructions(
-                transaction, associated_token_account, amount, 0
-            )
-            instructions = [
-                set_compute_unit_limit(UNIT_BUDGET),
-                set_compute_unit_price(UNIT_PRICE),
-            ]
-
-            instructions.append(buy_instruction)
-
-            try:
-                # Send transaction
-                tx = await self.__send_transaction(instructions)
-                print(
-                    f"INFO [BUY RPC] Buy transaction sent: {tx} ; confirming transaction..."
-                )
-
-                confirmed = await self.client.confirm_transaction(
-                    tx, commitment="confirmed"
-                )
-                return confirmed
-            except Exception as e:
-                print(f"ERROR [BUY RPC] Buy transaction failed: {e}")
-                return False
-
-    async def send_rpc_sell_transaction(self, transaction):
-        """Sells all available tokens at market price using RPC."""
-        token = transaction.token
-        token_address = str(token.mint)
-        if await self.client.is_connected() is True:
-            print(f"INFO [SELL RPC] Selling token: {token.name} ({token_address})")
-
-            sender = self.account.pubkey()
-
-            # Get Associated Token Address (ATA)
-            associated_token_account = get_associated_token_address(sender, token.mint)
-
-            # Fetch Token Balance
-            token_balance = Utils.get_token_balance(sender, token.mint)
-
-            if token_balance == 0 or token_balance is None:
-                print(f"WARNING [SELL RPC] No tokens to sell for {token_address}")
-                return False
-
-            print(
-                f"INFO [SELL RPC] Selling {token_balance} tokens of {token_address}..."
-            )
-
-            # Calculate amount of tokens
-            amount = transaction.tokens_for_sol(token_balance)
-
-            # Build instructions
-            sell_instruction = self.__build_instructions(
-                transaction, associated_token_account, amount, 1
-            )
-            instructions = [
-                set_compute_unit_limit(UNIT_BUDGET),
-                set_compute_unit_price(UNIT_PRICE),
-                sell_instruction,
-                close_account(
-                    CloseAccountParams(
-                        SYSTEM_TOKEN_PROGRAM,
-                        associated_token_account,
-                        sender,
-                        sender,
-                    )
-                ),
-            ]
-            try:
-                # Send transaction
-                tx = await self.__send_transaction(instructions)
-                print(
-                    f"INFO [SELL RPC] Sell transaction sent: {tx} ; confirming transaction..."
-                )
-
-                confirmed = await self.client.confirm_transaction(
-                    tx, commitment="confirmed"
-                )
-                print(f"INFO [SELL RPC] Sell transaction confirmed: {confirmed}")
-
-                return confirmed
-            except Exception as e:
-                print(f"ERROR [SELL RPC] Sell transaction failed: {e}")
-                return False
-
-    def send_http_buy_transaction(self, transaction):
-        """Sends a BUY transaction using HTTP and pumportal API."""
-        token = transaction.token
-        token_address = str(token.mint)
-        if len(self.tracked_tokens) >= MAX_TOKEN_TRACKED:
-            print(
-                f"WARNING [BUY HTTP] Max tracked tokens ({MAX_TOKEN_TRACKED}) reached. Cannot buy {token.name} ({token_address})"  # noqa: E501
-            )
-            return False  # Skip buying
-
-        if PUMPPORTAL_API_KEY is None:
-            print("ERROR [BUY HTTP] Missing PUMPPORTAL_API_KEY")
-            return False
-
-        try:
-            print(f"INFO [BUY HTTP] Buying token: {token.name} ({token_address})...")
-
-            response = requests.post(
-                url=f"https://pumpportal.fun/api/trade?api-key={PUMPPORTAL_API_KEY}",
-                data={
-                    "action": "buy",
-                    "mint": token_address,
-                    "amount": BUY_AMOUNT_SOL,
-                    "denominatedInSol": "true",
-                    "slippage": SLIPPAGE_BPS,
-                    "priorityFee": 0.001,
-                    "pool": "pump",
-                },
-            )
-            data = response.json()
-            if "errors" in data and data["errors"]:
-                print(f"ERROR [BUY HTTP] Buy transaction failed: {data['errors']}")
-                return False
-
-            print(f"INFO [BUY HTTP] Buy transaction sent: {data['signature']}")
-            return True
-
-        except Exception as e:
-            print(f"ERROR [BUY HTTP] Buy transaction failed: {e}")
-            return False
-
-    def send_http_sell_transaction(self, transaction, percentage=100):
-        """Send a SELL transaction using HTTP and pumportal API."""
-        if PUMPPORTAL_API_KEY is None:
-            print("ERROR [SELL HTTP] Missing PUMPPORTAL_API_KEY")
-            return False
-
-        token = transaction.token
-        token_address = str(token.mint)
-
-        print(f"INFO [SELL HTTP] Selling token: {token_address}")
-
-        try:
-            response = requests.post(
-                url=f"https://pumpportal.fun/api/trade?api-key={PUMPPORTAL_API_KEY}",
-                data={
-                    "action": "sell",
-                    "mint": token_address,
-                    "amount": f"{percentage}%",
-                    "denominatedInSol": "false",
-                    "slippage": SLIPPAGE_BPS,
-                    "priorityFee": 0.001,
-                    "pool": "pump",
-                },
-            )
-            data = response.json()
-            if "errors" in data and data["errors"]:
-                print(f"ERROR [SELL HTTP] Sell transaction failed: {data['errors']}")
-                return False
-
-            print(f"INFO [SELL HTTP] Sell transaction sent: {data['signature']}")
-            return True
-        except Exception as e:
-            print(f"ERROR [SELL HTTP] Sell transaction failed: {e}")
-            return False
-
-    async def __send_transaction(self, instructions: list = []):
-        """Send a transaction using RPC."""
-        # Compile message
-        latest_blockhash = await self.client.get_latest_blockhash()
-        msg = Message(instructions, self.account.pubkey())
-        tx = SolTransaction([self.account], msg, latest_blockhash.value.blockhash)
-        # Send transaction
-        res = await self.client.send_transaction(
-            txn=tx,
-            opts=TxOpts(skip_preflight=True, preflight_commitment=Confirmed),
-        )
-
-        return res.value
-
     async def __check_auto_sell(self, ws):
         """Auto-sell tokens after AUTO_SELL_AFTER_MINS minutes."""
         if AUTO_SELL_AFTER_MINS <= 0:
@@ -358,7 +147,7 @@ class Bot:
                 print(
                     f"INFO [AUTO-SELL] Selling token {token.name} ({token_address}) after {AUTO_SELL_AFTER_MINS} mins"  # noqa: E501
                 )
-                await self.__sell_token(ws, transaction)
+                await self.__sell_token(ws, transaction, True)
 
     async def __websocket_disconnected(self, ws):
         """Websocket has been disconnected."""
@@ -380,39 +169,26 @@ class Bot:
 
     async def __buy_token(self, ws, tx):
         """Buy a token using RPC or HTTP and save it to storage."""
-        res = (
-            await self.send_rpc_buy_transaction(tx)
-            if self.is_rpc
-            else self.send_http_buy_transaction(tx)
-        )
+        token = tx.token
         token_address = str(tx.token.mint)
-        if res is True:
-            buy_time = datetime.utcnow()
-            # Update and save storage
-            self.storage.tokens.append(
-                {
-                    "name": tx.token.name,
-                    "address": token_address,
-                    "status": "active",
-                    "price": tx.token_price(),
-                    "buy_time": buy_time.isoformat(),
-                }
+        if len(self.tracked_tokens) >= MAX_TOKEN_TRACKED:
+            print(
+                f"WARNING [BUY HTTP] Max tracked tokens ({MAX_TOKEN_TRACKED}) reached. Cannot buy {token.name} ({token_address})"  # noqa: E501
             )
-            self.storage.save()
-            # Update tracked tokens, purchased datetime and partial sales
-            tx.token.price = tx.token_price()
-            self.tracked_tokens[token_address] = tx.token
-            self.token_purchase_time[token_address] = {
-                "transaction": tx,
-                "buy_time": buy_time,
-            }
-            self.partial_sales[token_address] = {
-                "half_sold": False,
-                "quarter_sold": False,
-            }
-            await self.subscribe_token_transactions(ws, token_address)
+        else:
+            res = False
+            if self.is_rpc:
+                rpc = RpcTransaction(self.client, tx, self.account)
+                res = await rpc.send_buy_transaction(BUY_AMOUNT_SOL)
+            else:
+                res = PumpPortalTransaction(tx).send_buy_transaction(
+                    amount=BUY_AMOUNT_SOL, slippage=SLIPPAGE_BPS
+                )
 
-    async def __sell_token(self, ws, tx):
+            if res is True:
+                await self.__save_token_bought(ws, tx, token_address)
+
+    async def __sell_token(self, ws, tx, auto_sell=False):
         """Sell a token using RPC or HTTP and update storage."""
         token_address = str(tx.token.mint)
         token = self.tracked_tokens.get(token_address)
@@ -421,15 +197,23 @@ class Bot:
             print(f"WARNING [SELL HTTP] Token {token_address} not tracked. Skipping.")
             return
 
+        if auto_sell is True:
+            await self.__execute_sell(ws, tx, 100)
+            return
+
         highest_price = self.tracked_tokens[token_address].price
         current_price = tx.token_price()
 
         res = False
         if current_price <= highest_price * (1 - TRAILING_STOP_LOSS):
-            print(f"INFO [SELL HTTP] Selling 100% of {token.name} due to trailing stop-loss")
+            print(
+                f"INFO [SELL HTTP] Selling 100% of {token.name} due to trailing stop-loss"
+            )
             await self.__execute_sell(ws, tx, 100)  # Sell 100%
             return
         else:
+
+            self.tracked_tokens[token_address].price = current_price
 
             if not self.is_rpc:
                 if token_address not in self.partial_sales:
@@ -456,7 +240,8 @@ class Bot:
                         "quarter_sold"
                     ] = True  # Mark second sell done
             else:
-                res = await self.send_rpc_sell_transaction(tx)
+                rpc = RpcTransaction(self.client, tx, self.account)
+                res = await rpc.send_sell_transaction()
 
                 if res is True:
                     await self.__clean_token_sold(ws, token_address)
@@ -477,6 +262,32 @@ class Bot:
         if token_address in self.token_purchase_time:
             del self.token_purchase_time[token_address]
 
+    async def __save_token_bought(self, ws, tx, token_address):
+        buy_time = datetime.utcnow()
+        # Update and save storage
+        self.storage.tokens.append(
+            {
+                "name": tx.token.name,
+                "address": token_address,
+                "status": "active",
+                "price": tx.token_price(),
+                "buy_time": buy_time.isoformat(),
+            }
+        )
+        self.storage.save()
+        # Update tracked tokens, purchased datetime and partial sales
+        tx.token.price = tx.token_price()
+        self.tracked_tokens[token_address] = tx.token
+        self.token_purchase_time[token_address] = {
+            "transaction": tx,
+            "buy_time": buy_time,
+        }
+        self.partial_sales[token_address] = {
+            "half_sold": False,
+            "quarter_sold": False,
+        }
+        await self.subscribe_token_transactions(ws, token_address)
+
     async def __execute_sell(self, ws, tx, percentage):
         """
         Executes a partial sell of a token.
@@ -490,127 +301,23 @@ class Bot:
         if not self.is_rpc:
             print(f"INFO [SELL] Selling {percentage}% of {token_address}")
 
-            res = self.send_http_sell_transaction(tx, percentage)
+            res = PumpPortalTransaction(tx).send_sell_transaction(
+                amount=percentage, slippage=SLIPPAGE_BPS
+            )
             if res is True:
-                print(f"INFO [SELL HTTP] Successfully sold {percentage}% of {token_address}")
+                print(
+                    f"INFO [SELL HTTP] Successfully sold {percentage}% of {token_address}"
+                )
 
                 # If selling 100%, remove from tracked tokens
                 if percentage == 100:
                     await self.__clean_token_sold(ws, token_address)
-
-    def __calculate_preventiv_sol_amount(self, amount=0, tx_type=0):
-        """
-        Depending if its a buy or sell transaction,
-        calculate the min or max amout of sol to spend
-        """
-        slippage_adjustment = 1
-        if tx_type == 0:
-            slippage_adjustment = 1 + (SLIPPAGE_PERCENT / 100)
         else:
-            slippage_adjustment = 1 - (SLIPPAGE_PERCENT / 100)
+            rpc = RpcTransaction(self.client, tx, self.account)
+            res = await rpc.send_sell_transaction()
 
-        return int((amount * slippage_adjustment) * SOL_DECIMALS)
-
-    def __get_instructions_accounts(self, transaction, ata):
-        """Generate the accounts for a transaction."""
-        return [
-            AccountMeta(pubkey=PUMP_GLOBAL, is_signer=False, is_writable=False),
-            AccountMeta(pubkey=PUMP_FEE, is_signer=False, is_writable=True),
-            AccountMeta(
-                pubkey=transaction.token.mint,
-                is_signer=False,
-                is_writable=False,
-            ),
-            AccountMeta(
-                pubkey=transaction.bondingCurveKey,
-                is_signer=False,
-                is_writable=True,
-            ),
-            AccountMeta(
-                pubkey=transaction.associatedBondingCurveKey,
-                is_signer=False,
-                is_writable=True,
-            ),
-            AccountMeta(pubkey=ata, is_signer=False, is_writable=True),
-            AccountMeta(pubkey=self.account.pubkey(), is_signer=True, is_writable=True),
-            AccountMeta(pubkey=SYSTEM_PROGRAM, is_signer=False, is_writable=False),
-            AccountMeta(
-                pubkey=SYSTEM_TOKEN_PROGRAM, is_signer=False, is_writable=False
-            ),
-            AccountMeta(pubkey=SYSTEM_RENT, is_signer=False, is_writable=False),
-            AccountMeta(
-                pubkey=PUMP_EVENT_AUTHORITY, is_signer=False, is_writable=False
-            ),
-            AccountMeta(pubkey=PUMP_PROGRAM, is_signer=False, is_writable=False),
-        ]
-
-    def __build_instructions(
-        self,
-        transaction,
-        ata,
-        amount=0,
-        tx_type=0,
-    ):
-        """Build instructions used inside a transaction."""
-        data = bytearray()
-        if tx_type == 0:
-            data.extend(struct.pack("<Q", 16927863322537952870))
-        else:
-            data.extend(struct.pack("<Q", 12502976635542562355))
-        data.extend(struct.pack("<Q", int(amount * TOKEN_DECIMALS)))
-        data.extend(
-            struct.pack("<Q", self.__calculate_preventiv_sol_amount(amount, tx_type))
-        )
-
-        return Instruction(
-            PUMP_PROGRAM,
-            bytes(data),
-            self.__get_instructions_accounts(transaction, ata),
-        )
-
-    async def __create_ata(self, ata, token, max_retries=5):
-        """Create an associated token account with retries strategy."""
-        for ata_attempt in range(max_retries):
-            try:
-                account_info = await self.client.get_account_info(ata)
-                if account_info.value is None:
-                    print(
-                        f"INFO [ATA RPC] Creating associated token account (Attempt {ata_attempt + 1})..."  # noqa: E501
-                    )
-                    create_ata_ix = create_associated_token_account(
-                        self.account.pubkey(), self.account.pubkey(), token.mint
-                    )
-                    message = Message([create_ata_ix], self.account.pubkey())
-                    latest_blockhash = await self.client.get_latest_blockhash()
-                    create_ata_tx = SolTransaction(
-                        [self.account],
-                        message,
-                        latest_blockhash.value.blockhash,
-                    )
-                    await self.client.send_transaction(
-                        txn=create_ata_tx,
-                        opts=TxOpts(
-                            skip_preflight=True, preflight_commitment=Confirmed
-                        ),
-                    )
-                    print(f"INFO [ATA RPC] Associated token account address: {ata}")
-                    break
-                else:
-                    print("WARNING [ATA RPC] Associated token account already exists.")
-                    print(f"INFO [ATA RPC] Associated token account address: {ata}")
-                    break
-            except Exception:
-                print(
-                    f"WARNING [ATA RPC] Attempt {ata_attempt + 1} to create associated token account failed"  # noqa: E501
-                )
-                if ata_attempt < max_retries - 1:
-                    wait_time = 2**ata_attempt
-                    sleep(wait_time)
-                else:
-                    print(
-                        "ERROR [ATA RPC] Max retries reached. Unable to create associated token account."  # noqa: E501
-                    )
-                    return False
+            if res is True:
+                await self.__clean_token_sold(ws, token_address)
 
     async def __reload_tracked_tokens(self, ws: websockets) -> None:
         """Reload tracked tokens from storage and subscribe to their transactions."""

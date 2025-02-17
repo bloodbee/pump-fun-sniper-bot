@@ -41,21 +41,24 @@ class TestTransaction:
 
     def test_token_price_calculation(self):
         """Test that token_price method correctly calculates price per token."""
-        transaction = Transaction(tokenAmount=100.0, solAmount=2.0)
+        transaction = Transaction(txType="buy", tokenAmount=100.0, solAmount=2.0)
         assert transaction.token_price() == 2.0 / 100.0
+
+        transaction_2 = Transaction(txType="create", initialBuy=100.0, solAmount=2.0)
+        assert transaction_2.token_price() == 2.0 / 100.0
 
     def test_token_price_with_zero_amount(self):
         """Test that token_price method returns None if tokenAmount is zero."""
-        transaction = Transaction(tokenAmount=0.0, solAmount=2.0)
+        transaction = Transaction(txType="sell", tokenAmount=0.0, solAmount=2.0)
         assert transaction.token_price() is None
 
     def test_token_price_with_none_values(self):
         """Test that token_price method returns None if required values are missing."""
-        transaction = Transaction(tokenAmount=None, solAmount=2.0)
+        transaction = Transaction(txType="buy", tokenAmount=None, solAmount=2.0)
         assert transaction.token_price() is None
 
-        transaction = Transaction(tokenAmount=100.0, solAmount=None)
+        transaction = Transaction(txType="buy", tokenAmount=100.0, solAmount=None)
         assert transaction.token_price() is None
 
-        transaction = Transaction(tokenAmount=None, solAmount=None)
+        transaction = Transaction(txType="buy", tokenAmount=None, solAmount=None)
         assert transaction.token_price() is None

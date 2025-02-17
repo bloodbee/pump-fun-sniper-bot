@@ -9,8 +9,14 @@ from solders.signature import Signature
 from solana.rpc.types import TokenAccountOpts
 from solana.rpc.commitment import Processed, Confirmed
 from solders.pubkey import Pubkey
+from dotenv import load_dotenv
+
+from .constants import SOL_DECIMALS
+
+load_dotenv()
 
 SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.6"))
+SLIPPAGE_PERCENT = float(os.getenv("SLIPPAGE_PERCENT")) / 100
 
 
 class Utils:
@@ -65,3 +71,17 @@ class Utils:
         discriminator = struct.unpack("<Q", discriminator_bytes)[0]
 
         return discriminator
+
+    @staticmethod
+    def calculate_preventiv_sol_amount(amount=0, tx_type=0):
+        """
+        Depending if its a buy or sell transaction,
+        calculate the min or max amout of sol to spend
+        """
+        slippage_adjustment = 1
+        if tx_type == 0:
+            slippage_adjustment = 1 + (SLIPPAGE_PERCENT / 100)
+        else:
+            slippage_adjustment = 1 - (SLIPPAGE_PERCENT / 100)
+
+        return int((amount * slippage_adjustment) * SOL_DECIMALS)
