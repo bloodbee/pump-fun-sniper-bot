@@ -40,7 +40,6 @@ class Parser:
                 tx.vSolInBondingCurve = self._safe_float("vSolInBondingCurve")
 
             tx.set_associated_bonding_curve()
-
             tx.token.price = tx.token_price()
 
             return tx

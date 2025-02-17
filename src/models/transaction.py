@@ -24,7 +24,9 @@ class Transaction:
     vSolInBondingCurve: Optional[float] = None
 
     def token_price(self):
-        if self.tokenAmount and self.solAmount and self.tokenAmount > 0:
+        if self.txType == 'create' and self.initialBuy and self.solAmount and self.initialBuy > 0:  # noqa: E501
+            return self.solAmount / self.initialBuy
+        elif self.txType in ['buy', 'sell'] and self.tokenAmount and self.solAmount and self.tokenAmount > 0:  # noqa: E501
             return self.solAmount / self.tokenAmount
         return None
 

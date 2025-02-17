@@ -7,8 +7,27 @@ It aims to provide users with a competitive edge by executing trades faster than
 ## Features
 
 - **Automated Trading**: Automatically buys tokens as soon as they are listed.
+- **RPC or HTTP**: Use RPC (the one you prefer) or HTTP ([https://pumpportal.fun/](https://pumpportal.fun/)) to trade.
 - **Configurable Settings**: Customize the bot's behavior to suit your trading strategy.
-- **Automatic sell**: Sell tracked tokens automatically using trailing stop-loss or time passed.
+- **Automatic sell**: Sell tokens automaticcaly using 3 strategies (see below).
+- **Token storage**: Save tracked tokens with automatic reload.
+
+## Sell strategies
+
+### Trailing stop-loss
+
+The bot will sell tokens buy checking each "sell" transactions. If the current transaction price is lower than defined trailing stop-loss percentage, 100% of the tokens are sold.
+
+### Automatic sell after X mins
+
+The bot will automatically sell tokens after X mins passed, as defined per the user.
+It can happen if a token keep going up (trailing stop-loss is not raised), or when there are no sell transactions.
+
+### Take-profit
+
+The bot will sell 50% of tokens at +25% price raise. Then will sell 25% of tokens remaining at +50% price raises.
+Therefore, you will have gains and some tokens remaining.
+It guarantees to have a profit when a token keep going to the moon.
 
 ## Installation
 

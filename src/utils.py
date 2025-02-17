@@ -26,7 +26,7 @@ class Utils:
 
             if similarity >= SIMILARITY_THRESHOLD:
                 print(
-                    f"[SKIPPED] {new_token_name} (Too similar to {existing_name}, Similarity: {similarity:.2f})"  # noqa: E501
+                    f"INFO [SKIPPED] {new_token_name} (Too similar to {existing_name}, Similarity: {similarity:.2f})"  # noqa: E501
                 )
                 return True
         return False
